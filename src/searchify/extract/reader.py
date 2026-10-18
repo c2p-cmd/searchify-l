@@ -23,6 +23,9 @@ from . import htmltext as extract_mod
 from . import pages as pages_mod
 from . import render as render_mod
 from . import stealth as stealth_mod
+from ..config import get_settings
+from ..search._common import SearchBackendError
+from ..search.cloud import tavily_post
 
 FULL_PAGE_RATIO = 0.4  # offline auf 40 URLs: 0.3 bis 0.5 gleich gut, 0.6 kostet Precision
 WIKI_MIN_WORDS = 100  # darunter (Stub, Weiterleitung) zusaetzlich trafilatura
@@ -496,7 +499,45 @@ def read_pages(
             failed = failed + [{"url": d.get("url"), "error": "Zu wenig Text", "static": d} for d in thin]
         if failed:
             docs, failed = _render_failed(docs, failed, fmt, urls, deadline)
+    if failed and get_settings().tavily_api_key:
+        docs, failed = _tavily_failed(docs, failed, fmt, urls, deadline)
     return docs, failed
+
+
+TAVILY_TIMEOUT_S = 20.0
+TAVILY_MIN_REST_S = 2.0
+TAVILY_MAX_URLS = 20  # Tavily Extract nimmt hoechstens 20 Adressen je Aufruf
+
+
+def _tavily_failed(
+    docs: List[Dict], failed: List[Dict], fmt: str, urls: List[str],
+    deadline: Optional[float] = None,
+) -> Tuple[List[Dict], List[Dict]]:
+    """Letzte Sicherheitsstufe: Seiten, an denen alle eigenen Stufen gescheitert
+    sind, liest Tavily Extract. Laeuft nur mit TAVILY_API_KEY; scheitert der
+    Aufruf, bleiben die Fehlschlaege wie sie waren."""
+    rest = TAVILY_TIMEOUT_S if deadline is None else min(TAVILY_TIMEOUT_S, deadline - time.monotonic())
+    if rest < TAVILY_MIN_REST_S:
+        return docs, failed
+    wanted = [f["url"] for f in failed if f.get("url")][:TAVILY_MAX_URLS]
+    try:
+        data = tavily_post("extract", {"urls": wanted, "format": fmt}, rest)
+    except SearchBackendError:
+        return docs, failed
+    got = {}
+    for it in data.get("results", []):
+        content = (it.get("raw_content") or "").strip()
+        if it.get("url") in wanted and content:
+            doc = extract_mod._doc(it["url"], {}, content, [])
+            doc["source"] = "tavily"
+            got[it["url"]] = doc
+    for url, doc in got.items():
+        pages_mod._docs().put(f"{_PREFIX}{fmt}|{url}", doc)
+        docs.append(doc)
+    still = [f for f in failed if f.get("url") not in got]
+    order = {u: i for i, u in enumerate(urls)}
+    docs.sort(key=lambda d: order.get(d.get("url"), len(order)))
+    return docs, still
 
 
 RENDER_MAX = 2  # hoechstens so viele Seiten je Anfrage nachrendern (je 2-10 s)

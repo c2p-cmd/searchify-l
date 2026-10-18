@@ -4,7 +4,7 @@ from searchify.search._common import dedupe_and_filter, host_matches, site_scope
 
 
 def test_backends_registered():
-    assert set(BACKENDS) == {"duckduckgo", "searxng", "serper"}
+    assert set(BACKENDS) == {"duckduckgo", "searxng", "serper", "tavily"}
 
 
 def test_host_matches_subdomains():

@@ -31,6 +31,8 @@ class Settings:
     search_fallback: str
     searxng_url: str
     serper_api_key: str
+    # Tavily: last safety net for search and reading, only if its key is set.
+    tavily_api_key: str
 
     # Reranker: a local cross-encoder loaded by Hugging Face name, or a local path.
     reranker_model: str
@@ -46,6 +48,7 @@ def get_settings() -> Settings:
         search_fallback=_get("SEARCH_FALLBACK", "searxng"),
         searxng_url=_get("SEARXNG_URL", ""),
         serper_api_key=_get("SERPER_API_KEY", ""),
+        tavily_api_key=_get("TAVILY_API_KEY", ""),
         reranker_model=_get("RERANKER_MODEL", "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"),
         fetch_timeout=_get_int("FETCH_TIMEOUT", 15),
     )

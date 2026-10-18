@@ -184,9 +184,14 @@ ports. Details: [`docs/architecture.md`](docs/architecture.md).
 | `duckduckgo` | no | Default. Works immediately via the `ddgs` package. |
 | `searxng` | no | Your own instance. Fast and private; set `SEARXNG_URL`. |
 | `serper` | yes | Optional Google fallback. Off unless `SERPER_API_KEY` is set. |
+| `tavily` | yes | Last safety net. Off unless `TAVILY_API_KEY` is set, and then only asked when every other backend found nothing. |
 
 Choose the primary with `SEARCH_BACKEND` and a fallback with `SEARCH_FALLBACK`.
 The default chain is local only: DuckDuckGo, then SearXNG if configured.
+
+With `TAVILY_API_KEY` set, Tavily becomes the last step in two places: in search when
+every backend came back empty, and in reading when every local stage (static fetch,
+browser, Camoufox) failed on a page. When the local stack works, Tavily is never called.
 
 ```python
 from searchify import search
@@ -252,7 +257,7 @@ The browser stages need `pip install "searchify[browser]"` and
 ## Configuration
 
 Every setting is optional and read from the environment (see `.env.example`):
-`SEARCH_BACKEND`, `SEARCH_FALLBACK`, `SEARXNG_URL`, `SERPER_API_KEY`,
+`SEARCH_BACKEND`, `SEARCH_FALLBACK`, `SEARXNG_URL`, `SERPER_API_KEY`, `TAVILY_API_KEY`,
 `RERANKER_MODEL`, `FETCH_TIMEOUT`. No key is ever read from code.
 
 ## Tests
