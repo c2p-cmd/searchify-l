@@ -68,6 +68,29 @@ instance or a cloud fallback.
 | `rerank(query, items)` | Reorders results or passages best-first with a multilingual cross-encoder (`mmarco-mMiniLMv2`). Point `RERANKER_MODEL` at your own model to swap it. |
 | `POST /search`, `POST /extract` | The same as an HTTP service, see below. |
 
+## How the research agent works
+
+The package finds and reads pages. [`skill/`](skill/) turns it into a research agent: drop the
+folder into Claude Code (or any agent with skills) and it researches the way a careful analyst
+does.
+
+1. **Every claim needs a checked source.** Each statement in the answer gets a source number
+   and a verbatim quote, and `sources.py quote` only accepts the quote if it really appears in
+   the page text. Before the answer counts as done, `sources.py verify` fails if any claim has
+   no checked quote, and with `--numbers` also if a number in a sentence is not in its quotes.
+   An invented fact or a changed figure stops the answer instead of reaching you.
+2. **Sources are kept, not thrown away.** URLs and quotes stay in a ledger file, and every hit
+   goes into a shared found-list (`--seen`). You can come back later, re-check every quote
+   live (`verify --check-urls`) and continue the research where it stopped.
+3. **Not just your words as typed.** The agent searches the question several ways: other
+   languages, synonyms, the provider's and the participant's point of view, a broad and a
+   niche term, filters like `site:` or the year. Duplicates are merged, and hits that several
+   engines found rank higher. In our own test (9 research tasks, October 2026), three extra niche
+   queries raised the share of known good sources in the top 30 from 18% to 23%.
+
+The skill's own web search (`skill/references/search.py`) uses Tavily, Exa, Serper and Jina,
+each only if you set its key (all have free tiers). Setup: [`skill/README.md`](skill/README.md).
+
 ## Benchmark
 
 Run `final_2031`, 15 Oct 2026, 146 fresh pages (Wikipedia, GitHub, Hacker News, news,
