@@ -17,21 +17,8 @@ deduplicated and domain-filtered.
 
 ## Extraction load ladder
 
-`extract(urls)` escalates only as far as a page needs:
-
-1. **Static fetch** with httpx, falling back to `curl_cffi` on 403/429/503.
-2. A thin result (under 40 words, or under 300 with challenge text) counts as a
-   miss and escalates.
-3. **Shared browser** — one shared Chromium, all requests through the SSRF-checked
-   proxy, a few slots, closed after idle.
-4. **Direct browser** — a page in the same browser that loads through the outbound
-   proxy (public addresses and the normal web ports only, resolved address pinned),
-   with a short challenge wait.
-5. If every stage fails, the static text is kept.
-
-Browser stages need the `browser` extra (`playwright`), and `playwright install
-chromium-headless-shell`. The outbound proxy only ever connects to public
-addresses on ports 80/443/8080/8443.
+Described with its limits and settings in the [README](../README.md#http-service).
+The outbound proxy only ever connects to public addresses on ports 80/443/8080/8443.
 
 ## Reranking
 
