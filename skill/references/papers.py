@@ -31,12 +31,16 @@ S2_FIELDS = "title,year,venue,citationCount,externalIds,openAccessPdf,abstract,u
 
 def _get(url, headers=None, raw=False):
     h = {"User-Agent": UA}
-    if "semanticscholar" in url and os.environ.get("S2_API_KEY"):
-        h["x-api-key"] = os.environ["S2_API_KEY"]
     h.update(headers or {})
+    key = os.environ.get("S2_API_KEY")
+    parts = urllib.parse.urlsplit(url)
+    send_key = bool(key) and parts.scheme == "https" and parts.hostname == "api.semanticscholar.org"
     for attempt in range(3):  # Semantic Scholar ohne Key antwortet oft 429
+        req = urllib.request.Request(url, headers=h)
+        if send_key:  # nur an die API selbst, nicht bei Weiterleitungen oder PDF-Links
+            req.add_unredirected_header("x-api-key", key)
         try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=TIMEOUT) as r:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
                 data = r.read()
             return data if raw else json.loads(data)
         except urllib.error.HTTPError as e:

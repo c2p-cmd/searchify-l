@@ -1,6 +1,6 @@
 """Answer a question with the passages that say it, straight from the web.
 
-    python examples/answer.py "When did the Berlin Wall fall?"
+    python examples/answer.py "How much does the NVIDIA DGX Spark cost and how much memory does it have?"
 """
 import sys
 import time
@@ -14,7 +14,7 @@ def short(text: str, limit: int = 160) -> str:
 
 
 def main() -> None:
-    question = " ".join(sys.argv[1:]) or "When did the Berlin Wall fall?"
+    question = " ".join(sys.argv[1:]) or "How much does the NVIDIA DGX Spark cost and how much memory does it have?"
 
     t = time.perf_counter()
     hits = search(question, max_results=8)
@@ -29,9 +29,21 @@ def main() -> None:
     ]
     rerank(question, passages[:1])  # load the model once, so the timing below is the ranking
     t = time.perf_counter()
-    best = rerank(question, passages, top_k=3)
+    ranked = rerank(question, passages)
     rank_s = time.perf_counter() - t
 
+    best, sites = [], set()  # the best passage per site, so every line adds a source
+    for p in ranked:
+        site = urlparse(p["url"]).netloc
+        if site not in sites:
+            sites.add(site)
+            best.append(p)
+        if len(best) == 3:
+            break
+
+    if not best:
+        print("No pages found. DuckDuckGo may be rate-limiting you; try again in a minute or set SEARXNG_URL.")
+        return
     for i, p in enumerate(best, 1):
         print(f"{i}. {short(p['content'])}\n   {urlparse(p['url']).netloc}")
     print(f"\nsearched and read {len(pages)} pages in {read_s:.1f} s, "

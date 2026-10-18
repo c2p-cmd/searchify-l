@@ -11,21 +11,23 @@ reranker in one small Python package. No API key needed: search runs over DuckDu
 your own SearXNG instance, paid providers are an optional fallback.
 
 ```
-$ python examples/answer.py "When did the Berlin Wall fall?"
-1. The Berlin Wall fell on November 9, 1989, when East German authorities mistakenly
-   announced immediate travel freedoms during a press conference. East Berliners ...
-   www.berlintourism.org
-2. The Berlin Wall fell on 9 November 1989 during the Peaceful Revolution, marking the
-   beginning of the destruction of the figurative Iron Curtain, as East Berlin ...
-   en.wikipedia.org
-3. The fall of the Berlin Wall in November of 1989 was a defining moment in modern world
-   history and the Cold War. In fact, the Berlin Wall had stood as one of ...
-   historycrunch.com
+$ python examples/answer.py "How much does the NVIDIA DGX Spark cost and how much memory does it have?"
+1. How much does the NVIDIA DGX Spark cost? The Founders Edition launched at $3,999 in
+   October 2025 and now lists for $4,699 on NVIDIA's marketplace after a ...
+   gpusmith.com
+2. The NVIDIA DGX Spark is a compact desktop AI computer (150mm x 150mm, 1.2kg) powered by
+   the NVIDIA GB10 Grace Blackwell Superchip. It delivers 1 petaFLOP of ...
+   www.aitooldiscovery.com
+3. The NVIDIA DGX Spark is a palm-sized desktop AI computer built on the GB10 Grace Blackwell
+   Superchip, with 128 GB of unified memory, 273 GB/s of bandwidth, and ...
+   millionminer.com
 
-searched and read 5 pages in 2.6 s, ranked 506 passages in 1.9 s
+searched and read 5 pages in 5.8 s, ranked 254 passages in 1.3 s
 ```
 
-That is the whole pipeline in [`examples/answer.py`](examples/answer.py), about 20 lines:
+A price that changed after launch is exactly what a language model gets wrong from memory.
+Searchify reads the live pages, ranks every paragraph against the question and returns the
+best one per source. The core of [`examples/answer.py`](examples/answer.py):
 
 ```python
 from searchify import search, extract, rerank
@@ -35,7 +37,7 @@ pages = extract([h["url"] for h in hits[:5]])             # clean text of the to
 passages = [{"content": p, "url": page["url"]}            # one item per paragraph
             for page in pages for p in page["content"].split("\n")
             if len(p.split()) >= 12]
-best = rerank(question, passages, top_k=3)                # the paragraphs that answer it
+ranked = rerank(question, passages)                       # best paragraphs first
 ```
 
 Run it once and the reranker model (about 470 MB) downloads; after that it is cached.
