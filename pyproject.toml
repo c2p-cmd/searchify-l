@@ -35,8 +35,8 @@ api = ["fastapi>=0.110", "uvicorn>=0.29", "pydantic>=2.6"]
 dev = ["pytest>=8.0"]
 
 [project.urls]
-Homepage = "https://github.com/searchify/searchify"
-Issues = "https://github.com/searchify/searchify/issues"
+Homepage = "https://github.com/sami-mag07/searchify-l"
+Issues = "https://github.com/sami-mag07/searchify-l/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

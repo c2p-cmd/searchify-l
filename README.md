@@ -1,41 +1,72 @@
-# searchify
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo-light.svg" alt="searchify" width="380">
+  </picture>
+</p>
 
-Local-first web search, clean content extraction and fast reranking, in one small
-Python package. No API key required: search runs over DuckDuckGo or your own
-SearXNG instance out of the box. Paid providers are an optional fallback, off
-unless you set their key.
+**Web search for AI agents, running on your own machine.** Ask a question and get back the
+passages that answer it, with their sources. Search, clean page extraction and a fast
+reranker in one small Python package. No API key needed: search runs over DuckDuckGo or
+your own SearXNG instance, paid providers are an optional fallback.
+
+```
+$ python examples/answer.py "When did the Berlin Wall fall?"
+1. The Berlin Wall fell on November 9, 1989, when East German authorities mistakenly
+   announced immediate travel freedoms during a press conference. East Berliners ...
+   www.berlintourism.org
+2. The Berlin Wall fell on 9 November 1989 during the Peaceful Revolution, marking the
+   beginning of the destruction of the figurative Iron Curtain, as East Berlin ...
+   en.wikipedia.org
+3. The fall of the Berlin Wall in November of 1989 was a defining moment in modern world
+   history and the Cold War. In fact, the Berlin Wall had stood as one of ...
+   historycrunch.com
+
+searched and read 5 pages in 2.6 s, ranked 506 passages in 1.9 s
+```
+
+That is the whole pipeline in [`examples/answer.py`](examples/answer.py), about 20 lines:
 
 ```python
 from searchify import search, extract, rerank
 
-hits = search("solid-state batteries", max_results=5)   # keyless
-docs = extract([hits[0]["url"]])                          # clean article text
-best = rerank("solid-state batteries", docs, top_k=3)     # reorder by relevance
-print(best[0]["content"][:300])
+hits = search(question, max_results=8)                    # keyless web search
+pages = extract([h["url"] for h in hits[:5]])             # clean text of the top pages
+passages = [{"content": p, "url": page["url"]}            # one item per paragraph
+            for page in pages for p in page["content"].split("\n")
+            if len(p.split()) >= 12]
+best = rerank(question, passages, top_k=3)                # the paragraphs that answer it
 ```
+
+Run it once and the reranker model (about 470 MB) downloads; after that it is cached.
 
 ## Install
 
+Not on PyPI yet, so install from GitHub:
+
 ```bash
-pip install searchify                 # search + extraction
-pip install "searchify[rerank]"       # add the cross-encoder reranker
-pip install "searchify[api,browser]"  # add the HTTP service and the browser stage
+pip install "searchify[rerank] @ git+https://github.com/sami-mag07/searchify-l"
 ```
 
-Then set nothing and search works. Copy `.env.example` to `.env` only if you want
-a SearXNG instance or a cloud fallback.
+| Extra | Adds |
+|---|---|
+| (none) | search and extraction |
+| `rerank` | the cross-encoder reranker (`sentence-transformers`) |
+| `api` | the HTTP service (`fastapi`, `uvicorn`) |
+| `browser` | the browser stages for JavaScript and bot-protected pages (`playwright`) |
+| `stealth` | the optional Camoufox stage |
+
+Then set nothing and search works. Copy `.env.example` to `.env` only if you want a SearXNG
+instance or a cloud fallback.
 
 ## What you get
 
-- **search(query)** — web results as `{title, url, content, engine}`. Local by
-  default (DuckDuckGo), or your own SearXNG instance, with an optional cloud
-  fallback. No key needed for the local backends.
-- **extract(urls)** — the clean article text of each page, without menus, footers
-  or cookie banners. Starts with a fast fetch and only opens a browser when a page
-  needs one. The browser stages go through an SSRF-safe outbound proxy.
-- **rerank(query, items)** — reorder results best-first with a fast cross-encoder.
-  Uses a public MiniLM by default; point `RERANKER_MODEL` at your own fine-tuned
-  model to swap it in.
+| Call | What it does |
+|---|---|
+| `search(query)` | Web results as `{title, url, content, engine}`. DuckDuckGo by default, or your own SearXNG instance, with an optional cloud fallback. |
+| `extract(urls)` | The clean article text of each page, without menus, footers or cookie banners. Starts with a fast fetch and only opens a browser when a page needs one. |
+| `rerank(query, items)` | Reorders results or passages best-first with a multilingual cross-encoder (`mmarco-mMiniLMv2`). Point `RERANKER_MODEL` at your own model to swap it. |
+| `POST /search`, `POST /extract` | The same as an HTTP service, see below. |
 
 ## Benchmark
 
@@ -103,6 +134,23 @@ the challenge only clears after roughly 5 seconds.
 Rules kept during tuning: no captcha solving, no result gaming (never remove real text just to
 raise a number), the safety limits never weakened. The run measured the default ladder below;
 the optional Camoufox stage (`READER_STEALTH=1`) was not part of it.
+
+## How it works
+
+```mermaid
+flowchart LR
+    Q[Question] --> S[search<br/>DuckDuckGo or SearXNG]
+    S --> F[extract<br/>fast fetch first]
+    F -->|thin or blocked| B[browser stages<br/>behind a safe proxy]
+    F --> X[clean text<br/>resiliparse, trafilatura]
+    B --> X
+    X --> R[rerank<br/>cross-encoder]
+    R --> O[Best passages<br/>with sources]
+```
+
+Every stage only runs when the previous one was not enough: most pages never open a
+browser, and the browser stages only ever connect to public addresses on the normal web
+ports. Details: [`docs/architecture.md`](docs/architecture.md).
 
 ## Search backends
 
@@ -182,10 +230,19 @@ Every setting is optional and read from the environment (see `.env.example`):
 `SEARCH_BACKEND`, `SEARCH_FALLBACK`, `SEARXNG_URL`, `SERPER_API_KEY`,
 `RERANKER_MODEL`, `FETCH_TIMEOUT`. No key is ever read from code.
 
-## Architecture
+## Tests
 
-See [`docs/architecture.md`](docs/architecture.md) for the search backend chain and
-reranking. The extraction load ladder is described above under HTTP service.
+```bash
+pip install -e ".[dev,api]"
+pytest
+```
+
+## Limits
+
+- No own web index. Breadth depends on DuckDuckGo or the engines behind your SearXNG.
+- DuckDuckGo rate-limits heavy use. For anything beyond a few queries a minute, run SearXNG.
+- Bot-protected pages: 31% get through (see the benchmark). There is no captcha solving.
+- The first `rerank` call loads the model, which takes a few seconds.
 
 ## License
 
