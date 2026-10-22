@@ -43,8 +43,10 @@ def search(
     as_json: bool = JSON_OPT,
 ) -> None:
     """Search the web and print the hits."""
-    from .search import SearchBackendError, search as web_search
+    from .search import BACKENDS, SearchBackendError, search as web_search
 
+    if backend is not None and backend not in BACKENDS:
+        _fail(f"unknown backend {backend!r}, use {', '.join(BACKENDS)}", as_json, results=[])
     filters = {
         "language": language,
         "time_range": time_range,

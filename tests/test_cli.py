@@ -33,6 +33,12 @@ def test_search_error_is_json_and_nonzero(monkeypatch):
     assert json.loads(result.stdout)["error"] == "down"
 
 
+def test_search_rejects_unknown_backend():
+    result = runner.invoke(cli.app, ["search", "q", "--backend", "googel"])
+    assert result.exit_code == 1
+    assert "unknown backend" in json.loads(result.stdout)["error"]
+
+
 def test_extract_json_and_failures(monkeypatch):
     doc = {"url": "https://a.com", "title": "T", "content": "body"}
     monkeypatch.setattr(sys.modules["searchify.extract"], "read_pages",
